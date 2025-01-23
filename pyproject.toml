@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "makinet_agent"
+version = "0.0.1-alpha.1"
+description = ""
+authors = ["XYCode <xycode-xyc@outlook.com>"]
+license = "LGPL-2.1"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.14"
+rich = "^13.9.4"
+loguru = "^0.7.3"
+fastapi = "^0.115.6"
+typer = "^0.15.1"
+aiohttp = {extras = ["speedups"], version = "^3.11.11"}
+aiodns = "^3.2.0"
+yarl = "^1.18.3"
+uvicorn = "^0.34.0"
+pyopenssl = "^25.0.0"
+bson = "^0.5.10"
+asgiref = "^3.8.1"
+
+[tool.poetry.scripts]
+makinet-agent = "makinet_agent.main:cli"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
