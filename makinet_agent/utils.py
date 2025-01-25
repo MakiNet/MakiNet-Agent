@@ -4,10 +4,13 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from socket import gethostname
 
+import aiohttp
 from asgiref.sync import sync_to_async
 from loguru import logger
 from OpenSSL import crypto
 from yarl import URL
+
+from .global_vars import GLOBAL_VARS
 
 DEFAULT_CERT_FILE_DIR = Path.home().joinpath(".local/share/makinet-agent/certs")
 DEFAULT_IMAGE_FILE_DIR = Path.home().joinpath(".local/share/makinet-agent/images")
@@ -113,7 +116,9 @@ async def download_file(url: URL, path: Path):
 
     path = path.absolute()
 
-    process = await sync_to_async(subprocess.run, executor=DownloadWorkerPoolExecutor, thread_sensitive=False)(
+    process = await sync_to_async(
+        subprocess.run, executor=DownloadWorkerPoolExecutor, thread_sensitive=False
+    )(
         [
             "aria2c",
             "-x",
@@ -135,5 +140,20 @@ async def download_file(url: URL, path: Path):
     if process.returncode != 0:
         logger.error(f"Download {url} failed: {process.stderr.decode()}")
         raise RuntimeError(f"Download {url} failed")
-        
+
     return path
+
+
+async def register_to_control_plane():
+    async with aiohttp.ClientSession(
+        base_url=GLOBAL_VARS["server_api_url"],
+        connector=aiohttp.TCPConnector(ssl=False, limit=10),
+        timeout=aiohttp.ClientTimeout(total=10),
+    ) as sess:
+        response = await sess.post(
+            f"/agent/register?slug={GLOBAL_VARS['slug']}&api_url={GLOBAL_VARS['own_api_url']}"
+        )
+
+        if response.status != 200:
+            logger.error(f"Register to control plane failed: {await response.text()}")
+            raise RuntimeError("Register to control plane failed")
