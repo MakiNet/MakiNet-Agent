@@ -18,6 +18,7 @@ from pydantic import (
 )
 
 from .loggers import MemoryLogger, RunnerLoggers
+from .manager import task_manager
 
 
 class TaskStatus(BaseModel):
@@ -63,7 +64,7 @@ class Task(BaseModel):
         logger.debug(f"Running task {self.slug}")
 
         self._process = subprocess.Popen(
-            shlex.quote(self.command),
+            shlex.split(shlex.quote(self.command)),
             shell=True,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -106,9 +107,17 @@ class Task(BaseModel):
 
         def sidecar():
             """用于监控进程状态的线程，当进程结束时，会自动停止日志记录。"""
-            self._process.wait()
-            for _logger in self.loggers:
-                _logger.stop_log()
+            try:
+                self._process.wait(self.timeout)
+            except TimeoutError:
+                logger.info(f"Task {self.slug} timed out")
+                stopping_task = asyncio.create_task(self.stop())
+
+                while not stopping_task.done():
+                    continue
+            finally:
+                for _logger in self.loggers:
+                    _logger.stop_log()
 
         threading.Thread(target=sidecar).start()
 
@@ -148,3 +157,11 @@ class Task(BaseModel):
 
         if self._process is not None and self._process.poll() is None:
             self._kill()
+
+    def get_logger(self, logger_name: str) -> RunnerLoggers | None:
+        """获取日志记录器。"""
+        for _logger in self.loggers:
+            if _logger.logger_name == logger_name:
+                return _logger
+
+        return None
